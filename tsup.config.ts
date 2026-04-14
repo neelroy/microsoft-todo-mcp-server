@@ -1,4 +1,8 @@
 import { defineConfig } from 'tsup'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
+const { version } = require('./package.json')
 
 export default defineConfig({
   entry: [
@@ -18,6 +22,9 @@ export default defineConfig({
   sourcemap: true,
   dts: true,
   external: ['dotenv'],
+  define: {
+    __VERSION__: JSON.stringify(version),
+  },
   esbuildOptions(options) {
     options.platform = 'node'
   }

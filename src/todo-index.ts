@@ -6,6 +6,8 @@ import { join } from "path"
 import dotenv from "dotenv"
 import { tokenManager } from "./token-manager.js"
 
+declare const __VERSION__: string
+
 // Load environment variables
 dotenv.config()
 
@@ -14,12 +16,12 @@ console.error("Current working directory:", process.cwd())
 
 // Microsoft Graph API endpoints
 const MS_GRAPH_BASE = "https://graph.microsoft.com/v1.0"
-const USER_AGENT = "microsoft-todo-mcp-server/1.0"
+const USER_AGENT = `microsoft-todo-mcp-server/${__VERSION__}`
 
 // Create server instance
 const server = new McpServer({
   name: "mstodo",
-  version: "1.0.0",
+  version: __VERSION__,
 })
 
 // Helper function for making Microsoft Graph API requests
@@ -99,7 +101,7 @@ but API access is restricted for personal accounts.
     return data as T
   } catch (error) {
     console.error("Error making Graph API request:", error)
-    return null
+    throw error
   }
 }
 
@@ -299,7 +301,6 @@ interface Task {
     pattern: RecurrencePattern
     range: RecurrenceRange
   }
-  createdDateTime?: string
   lastModifiedDateTime?: string
   bodyLastModifiedDateTime?: string
   hasAttachments?: boolean
@@ -869,8 +870,16 @@ server.tool(
       // Build the query parameters
       const queryParams = new URLSearchParams()
 
+      // Default select includes createdDateTime which is not returned by the Graph API by default.
+      // Note: complex types (recurrence, startDateTime) cannot be used with $select.
+      const defaultSelect =
+        "id,title,status,importance,dueDateTime,completedDateTime,reminderDateTime,body,categories,createdDateTime,lastModifiedDateTime,hasAttachments"
+      // If user provided a select, ensure createdDateTime is included
+      const effectiveSelect =
+        select && !select.includes("createdDateTime") ? `${select},createdDateTime` : select || defaultSelect
+      queryParams.append("$select", effectiveSelect)
+
       if (filter) queryParams.append("$filter", filter)
-      if (select) queryParams.append("$select", select)
       if (orderby) queryParams.append("$orderby", orderby)
       if (top !== undefined) queryParams.append("$top", top.toString())
       if (skip !== undefined) queryParams.append("$skip", skip.toString())
