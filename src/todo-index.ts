@@ -255,6 +255,7 @@ interface Task {
   title: string
   status: string
   importance: string
+  createdDateTime?: string
   dueDateTime?: {
     dateTime: string
     timeZone: string
@@ -900,6 +901,11 @@ server.tool(
         // Add categories if available
         if (task.categories && task.categories.length > 0) {
           taskInfo += `\nCategories: ${task.categories.join(", ")}`
+        }
+
+        // Add created date if available
+        if (task.createdDateTime) {
+          taskInfo += `\nCreated: ${new Date(task.createdDateTime).toLocaleString()}`
         }
 
         // Add body content if available and not empty
