@@ -250,6 +250,7 @@ interface TaskList {
   isOwner?: boolean
   isShared?: boolean
   wellknownListName?: string // 'none', 'defaultList', 'flaggedEmails', 'unknownFutureValue'
+  createdDateTime?: string
 }
 
 interface RecurrencePattern {
@@ -317,8 +318,17 @@ interface ChecklistItem {
 server.tool(
   "get-task-lists",
   "Get all Microsoft Todo task lists (the top-level containers that organize your tasks). Shows list names, IDs, and indicates default or shared lists.",
-  {},
-  async () => {
+  {
+    sortBy: z
+      .enum(["displayName", "none"])
+      .optional()
+      .describe("Sort lists by: 'displayName' (A-Z) or 'none' (default API order). Note: createdDateTime is not supported by the Graph API for task lists."),
+    sortOrder: z
+      .enum(["asc", "desc"])
+      .optional()
+      .describe("Sort direction: 'asc' (default) or 'desc'"),
+  },
+  async ({ sortBy, sortOrder = "asc" }) => {
     try {
       const token = await getAccessToken()
       if (!token) {
@@ -345,7 +355,7 @@ server.tool(
         }
       }
 
-      const lists = response.value || []
+      let lists = response.value || []
       if (lists.length === 0) {
         return {
           content: [
@@ -355,6 +365,16 @@ server.tool(
             },
           ],
         }
+      }
+
+      // Sort client-side by displayName if requested
+      if (sortBy === "displayName") {
+        lists = lists.sort((a, b) => {
+          const valA = a.displayName.toLowerCase()
+          const valB = b.displayName.toLowerCase()
+          const cmp = valA < valB ? -1 : valA > valB ? 1 : 0
+          return sortOrder === "desc" ? -cmp : cmp
+        })
       }
 
       const formattedLists = lists.map((list) => {
@@ -867,26 +887,31 @@ server.tool(
         }
       }
 
-      // Build the query parameters
-      const queryParams = new URLSearchParams()
+      // Build OData query parameters manually — URLSearchParams encodes '$' as '%24'
+      // which the Graph API cannot parse (RequestBroker--ParseUri).
+      const queryParts: string[] = []
 
-      // Default select includes createdDateTime which is not returned by the Graph API by default.
+      // Note: 'title' cannot be used in $select (Graph API returns 400) but is always
+      // returned by the API regardless — so we omit it from $select intentionally.
       // Note: complex types (recurrence, startDateTime) cannot be used with $select.
       const defaultSelect =
-        "id,title,status,importance,dueDateTime,completedDateTime,reminderDateTime,body,categories,createdDateTime,lastModifiedDateTime,hasAttachments"
-      // If user provided a select, ensure createdDateTime is included
+        "id,status,importance,dueDateTime,completedDateTime,reminderDateTime,body,categories,createdDateTime,lastModifiedDateTime,hasAttachments"
+      // If user provided a select, remove 'title' (invalid) and ensure createdDateTime is included
+      const sanitizedSelect = select ? select.split(",").filter(f => f.trim() !== "title").join(",") : ""
       const effectiveSelect =
-        select && !select.includes("createdDateTime") ? `${select},createdDateTime` : select || defaultSelect
-      queryParams.append("$select", effectiveSelect)
+        sanitizedSelect && !sanitizedSelect.includes("createdDateTime")
+          ? `${sanitizedSelect},createdDateTime`
+          : sanitizedSelect || defaultSelect
+      queryParts.push(`$select=${effectiveSelect}`)
 
-      if (filter) queryParams.append("$filter", filter)
-      if (orderby) queryParams.append("$orderby", orderby)
-      if (top !== undefined) queryParams.append("$top", top.toString())
-      if (skip !== undefined) queryParams.append("$skip", skip.toString())
-      if (count !== undefined) queryParams.append("$count", count.toString())
+      if (filter) queryParts.push(`$filter=${encodeURIComponent(filter)}`)
+      if (orderby) queryParts.push(`$orderby=${encodeURIComponent(orderby)}`)
+      if (top !== undefined) queryParts.push(`$top=${top}`)
+      if (skip !== undefined) queryParts.push(`$skip=${skip}`)
+      if (count !== undefined) queryParts.push(`$count=${count}`)
 
       // Construct the URL with query parameters
-      const queryString = queryParams.toString()
+      const queryString = queryParts.join("&")
       const url = `${MS_GRAPH_BASE}/me/todo/lists/${listId}/tasks${queryString ? "?" + queryString : ""}`
 
       console.error(`Making request to: ${url}`)
