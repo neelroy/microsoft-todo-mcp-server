@@ -1,52 +1,68 @@
 # Microsoft To Do MCP
 
-[![CI](https://github.com/jordanburke/microsoft-todo-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/jordanburke/microsoft-todo-mcp-server/actions/workflows/ci.yml)
-[![npm version](https://badge.fury.io/js/microsoft-todo-mcp-server.svg)](https://www.npmjs.com/package/microsoft-todo-mcp-server)
+[![npm version](https://badge.fury.io/js/mstodo-mcp-server.svg)](https://www.npmjs.com/package/mstodo-mcp-server)
 
 A Model Context Protocol (MCP) server that enables AI assistants like Claude and Cursor to interact with Microsoft To Do via the Microsoft Graph API. This service provides comprehensive task management capabilities through a secure OAuth 2.0 authentication flow.
 
 ## Features
 
-- **16 MCP Tools**: Complete task management functionality including lists, tasks, checklist items, bulk archiving, and organization features
+- **16 MCP Tools**: Complete task management including lists, tasks, checklist items, bulk archiving, and organized views
+- **Task Creation Timestamps**: Surfaces `createdDateTime` on all tasks so you can see when each was added
+- **Smart Organized Views**: Groups task lists by naming patterns, emoji prefixes, and sharing status
+- **Bulk Archive**: Move completed tasks older than N days to an archive list, with dry-run preview
 - **Seamless Authentication**: Automatic token refresh with zero manual intervention
-- **OAuth 2.0 Authentication**: Secure authentication with automatic token refresh
-- **Microsoft Graph API Integration**: Direct integration with Microsoft's official API
+- **OAuth 2.0**: Secure authentication via MSAL with PKCE flow
+- **Microsoft Graph API v1.0**: Direct integration with Microsoft's official API
 - **Multi-tenant Support**: Works with personal, work, and school Microsoft accounts
-- **TypeScript**: Fully typed for reliability and developer experience
-- **ESM Modules**: Modern JavaScript module system
+- **TypeScript + ESM**: Fully typed, modern module system
 
 ## Prerequisites
 
 - Node.js 16 or higher (tested with Node.js 18.x, 20.x, and 22.x)
-- pnpm package manager
 - A Microsoft account (personal, work, or school)
 - Azure App Registration (see setup below)
 
 ## Installation
 
-### Option 1: Global Installation (Recommended)
+### Quickstart with npx (Recommended)
 
-```bash
-# Install globally using npm
-npm install -g microsoft-todo-mcp-server
+No installation needed — just configure Claude Desktop to run the server via npx:
 
-# Or using pnpm
-pnpm install -g microsoft-todo-mcp-server
-
-# Or run directly with npx (no installation)
-npx microsoft-todo-mcp-server
+```json
+{
+  "mcpServers": {
+    "microsoftTodo": {
+      "command": "npx",
+      "args": ["--yes", "mstodo-mcp-server@latest"],
+      "env": {
+        "ACCESS_TOKEN": "your_access_token",
+        "REFRESH_TOKEN": "your_refresh_token",
+        "CLIENT_ID": "your_client_id",
+        "CLIENT_SECRET": "your_client_secret",
+        "TENANT_ID": "your_tenant_id"
+      }
+    }
+  }
+}
 ```
 
-The package provides three command aliases:
-
-- `microsoft-todo-mcp-server` - Full package name
-- `mstodo` - Short alias for the MCP server
-- `mstodo-config` - Configuration helper tool
-
-### Option 2: Clone and Run Locally
+### Global Installation
 
 ```bash
-git clone https://github.com/jordanburke/microsoft-todo-mcp-server.git
+npm install -g mstodo-mcp-server
+```
+
+The package provides these command aliases:
+
+- `mstodo-mcp-server` — main entry point (matches package name for npx)
+- `mstodo` — short alias
+- `mstodo-config` — configuration helper
+- `mstodo-setup` — guided setup wizard
+
+### Clone and Run Locally
+
+```bash
+git clone https://github.com/neelroy/microsoft-todo-mcp-server.git
 cd microsoft-todo-mcp-server
 pnpm install
 pnpm run build
@@ -55,296 +71,194 @@ pnpm run build
 ## Azure App Registration
 
 1. Go to the [Azure Portal](https://portal.azure.com)
-2. Navigate to "App registrations" and create a new registration
-3. Name your application (e.g., "To Do MCP")
-4. For "Supported account types", select one of the following based on your needs:
-   - **Accounts in this organizational directory only (Single tenant)** - For use within a single organization
-   - **Accounts in any organizational directory (Any Azure AD directory - Multitenant)** - For use across multiple organizations
-   - **Accounts in any organizational directory and personal Microsoft accounts** - For both work accounts and personal accounts
+2. Navigate to **App registrations** → **New registration**
+3. Name your application (e.g., "TodoMCP")
+4. Choose the appropriate account type for your needs
 5. Set the Redirect URI to `http://localhost:3000/callback`
-6. After creating the app, go to "Certificates & secrets" and create a new client secret
-7. Go to "API permissions" and add the following permissions:
-   - Microsoft Graph > Delegated permissions:
-     - Tasks.Read
-     - Tasks.ReadWrite
-     - User.Read
-8. Click "Grant admin consent" for these permissions
+6. Under **Certificates & secrets**, create a new client secret
+7. Under **API permissions**, add Microsoft Graph delegated permissions:
+   - `Tasks.Read`
+   - `Tasks.ReadWrite`
+   - `Tasks.Read.Shared`
+   - `Tasks.ReadWrite.Shared`
+   - `User.Read`
+8. Click **Grant admin consent**
 
 ## Configuration
 
-### Environment Setup
+### Environment Variables
 
-Create a `.env` file in the project root (required for authentication):
-
-```env
-CLIENT_ID=your_client_id
-CLIENT_SECRET=your_client_secret
-TENANT_ID=your_tenant_setting
-REDIRECT_URI=http://localhost:3000/callback
-```
+| Variable | Description |
+|---|---|
+| `ACCESS_TOKEN` | Microsoft Graph access token |
+| `REFRESH_TOKEN` | Refresh token for automatic renewal |
+| `CLIENT_ID` | Azure App Registration client ID |
+| `CLIENT_SECRET` | Azure App Registration client secret |
+| `TENANT_ID` | Tenant ID or `organizations` / `consumers` / `common` |
+| `MSTODO_TOKEN_FILE` | Custom path for `tokens.json` (optional) |
 
 ### TENANT_ID Options
 
-- `organizations` - For multi-tenant organizational accounts (default if not specified)
-- `consumers` - For personal Microsoft accounts only
-- `common` - For both organizational and personal accounts
-- `your-specific-tenant-id` - For single-tenant configurations
-
-**Examples:**
-
 ```env
-# For multi-tenant organizational accounts (default)
-TENANT_ID=organizations
-
-# For personal Microsoft accounts
-TENANT_ID=consumers
-
-# For both organizational and personal accounts
-TENANT_ID=common
-
-# For a specific organization tenant
-TENANT_ID=00000000-0000-0000-0000-000000000000
+TENANT_ID=organizations          # Work/school accounts (multi-tenant)
+TENANT_ID=consumers              # Personal Microsoft accounts only
+TENANT_ID=common                 # Both work and personal accounts
+TENANT_ID=00000000-0000-0000-0000-000000000000  # Single tenant
 ```
 
-### Token Storage
+### Authentication Flow
 
-The server stores authentication tokens in `tokens.json` with automatic refresh 5 minutes before expiration. You can override the token file location:
+Run the auth server to obtain tokens interactively:
 
 ```bash
-# Using environment variable
-export MSTODO_TOKEN_FILE=/path/to/custom/tokens.json
-
-# Or pass tokens directly
-export MS_TODO_ACCESS_TOKEN=your_access_token
-export MS_TODO_REFRESH_TOKEN=your_refresh_token
+pnpm run auth   # Opens browser for Microsoft login, writes tokens.json
+pnpm run create-config  # Generates mcp.json from tokens.json
 ```
 
-## Usage
+Tokens are automatically refreshed 5 minutes before expiration.
 
-### Complete Setup Workflow
+## Claude Desktop Setup
 
-#### Step 1: Authenticate with Microsoft
-
-```bash
-# If installed globally
-git clone https://github.com/jordanburke/microsoft-todo-mcp-server.git
-cd microsoft-todo-mcp-server
-pnpm install
-pnpm run auth
-
-# Or if running locally
-pnpm run auth
-```
-
-This opens a browser window for Microsoft authentication and creates a `tokens.json` file.
-
-#### Step 2: Create MCP Configuration
-
-```bash
-# Generate MCP configuration file
-pnpm run create-config
-
-# Or use the global helper (if installed globally)
-mstodo-config
-```
-
-This creates an `mcp.json` file with your authentication tokens.
-
-#### Step 3: Configure Your AI Assistant
-
-**For Claude Desktop:**
-
-Add to your configuration file:
+Edit your Claude Desktop config file:
 
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "microsoftTodo": {
       "command": "npx",
-      "args": ["--yes", "microsoft-todo-mcp-server"],
+      "args": ["--yes", "mstodo-mcp-server@latest"],
       "env": {
-        "MS_TODO_ACCESS_TOKEN": "your_access_token",
-        "MS_TODO_REFRESH_TOKEN": "your_refresh_token"
+        "ACCESS_TOKEN": "your_access_token",
+        "REFRESH_TOKEN": "your_refresh_token",
+        "CLIENT_ID": "your_client_id",
+        "CLIENT_SECRET": "your_client_secret",
+        "TENANT_ID": "your_tenant_id"
       }
     }
   }
 }
 ```
 
-**For Cursor:**
-
-```bash
-# Copy to Cursor's global configuration
-cp mcp.json ~/.cursor/mcp-servers.json
-```
-
-### Available Scripts
-
-```bash
-# Development & Building
-pnpm run build        # Build TypeScript to JavaScript
-pnpm run dev          # Build and run CLI in one command
-
-# Running the Server
-pnpm start            # Run MCP server directly
-pnpm run cli          # Run MCP server via CLI wrapper
-npx microsoft-todo-mcp-server  # Run globally installed version
-
-# Authentication & Configuration
-pnpm run auth         # Start OAuth authentication server
-pnpm run create-config # Generate mcp.json from tokens.json
-
-# Code Quality
-pnpm run format       # Format code with Prettier
-pnpm run format:check # Check code formatting
-pnpm run lint         # Run linting checks
-pnpm run typecheck    # TypeScript type checking
-```
+Restart Claude Desktop after saving. The server will be downloaded and started automatically.
 
 ## MCP Tools
 
-The server provides 16 tools for comprehensive Microsoft To Do management:
-
 ### Authentication
 
-- **`auth-status`** - Check authentication status, token expiration, and account type
+| Tool | Description |
+|---|---|
+| `auth-status` | Check token status and expiration |
 
-### Task Lists (Top-level Containers)
+### Task Lists
 
-- **`get-task-lists`** - Retrieve all task lists with metadata (default, shared, etc.)
-- **`get-task-lists-organized`** - Get all task lists organized into logical folders/categories based on naming patterns, emoji prefixes, and sharing status. Supports grouping by `category`, `shared`, or `type`
-- **`create-task-list`** - Create a new task list
-- **`update-task-list`** - Rename an existing task list
-- **`delete-task-list`** - Delete a task list and all its contents
+| Tool | Description |
+|---|---|
+| `get-task-lists` | All lists with metadata; supports `sortBy` (displayName) and `sortOrder` |
+| `get-task-lists-organized` | Lists grouped by naming pattern, emoji prefix, and sharing status |
+| `create-task-list` | Create a new list |
+| `update-task-list` | Rename a list |
+| `delete-task-list` | Delete a list and all its tasks |
 
-### Tasks (Main Todo Items)
+### Tasks
 
-- **`get-tasks`** - Get tasks from a list with filtering, sorting, and pagination
-  - Supports OData query parameters: `$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`
-- **`create-task`** - Create a new task with full property support
-  - Title, description, due date, start date, importance, reminders, status, categories
-- **`update-task`** - Update any task properties
-- **`delete-task`** - Delete a task and all its checklist items
+| Tool | Description |
+|---|---|
+| `get-tasks` | Tasks from a list with OData support: `$orderby`, `$top`, `$skip`, `$filter`, `$select` |
+| `create-task` | Create a task (title, body, due date, importance, reminder, categories) |
+| `update-task` | Update any task properties |
+| `delete-task` | Delete a task and its checklist items |
+
+**Task output includes:**
+- Title, status (○ / ✓), importance, due date
+- `createdDateTime` — when the task was added
+- `lastModifiedDateTime`, body preview, categories, attachments flag
 
 ### Checklist Items (Subtasks)
 
-- **`get-checklist-items`** - Get subtasks for a specific task
-- **`create-checklist-item`** - Add a new subtask to a task
-- **`update-checklist-item`** - Update subtask text or completion status
-- **`delete-checklist-item`** - Remove a specific subtask
+| Tool | Description |
+|---|---|
+| `get-checklist-items` | Get subtasks for a task |
+| `create-checklist-item` | Add a subtask |
+| `update-checklist-item` | Update subtask text or completion |
+| `delete-checklist-item` | Remove a subtask |
 
 ### Bulk Operations
 
-- **`archive-completed-tasks`** - Move completed tasks older than a specified number of days from one list to an archive list. Supports dry-run mode to preview what would be archived before committing changes
+| Tool | Description |
+|---|---|
+| `archive-completed-tasks` | Move completed tasks older than N days to an archive list. Supports `dryRun` to preview before committing |
+
+## Graph API Notes
+
+The Microsoft Graph `todoTask` API has some quirks worth knowing:
+
+- **`title` is not selectable**: Passing `title` in `$select` returns a 400 error, but the API always returns it anyway. The server handles this automatically.
+- **`$filter` on `createdDateTime` is unsupported**: Use `$orderby=createdDateTime desc` and filter client-side.
+- **Complex types can't be in `$select`**: Fields like `recurrence` and `startDateTime` are excluded from the default select.
 
 ## Architecture
 
-### Project Structure
+```
+src/
+├── todo-index.ts       # MCP server — all 16 tools
+├── cli.ts              # CLI entry point with token loading
+├── auth-server.ts      # OAuth 2.0 / MSAL auth flow (port 3000)
+├── create-mcp-config.ts # Generates mcp.json from tokens.json
+├── setup.ts            # Guided setup wizard
+└── token-manager.ts    # Token refresh logic
+```
 
-- **MCP Server** (`src/todo-index.ts`) - Core server implementing the MCP protocol
-- **CLI Wrapper** (`src/cli.ts`) - Executable entry point with token management
-- **Auth Server** (`src/auth-server.ts`) - Express server for OAuth 2.0 flow
-- **Config Generator** (`src/create-mcp-config.ts`) - Helper to create MCP configurations
+Build system: [tsup](https://tsup.egoist.dev/) — version is auto-injected from `package.json` at build time.
 
-### Technical Details
+## Development
 
-- **Microsoft Graph API**: Uses v1.0 endpoints
-- **Authentication**: MSAL (Microsoft Authentication Library) with PKCE flow
-- **Token Management**: Automatic refresh 5 minutes before expiration
-- **Build System**: tsup for fast TypeScript compilation
-- **Module System**: ESM (ECMAScript modules)
+```bash
+pnpm install
+pnpm run build       # Compile TypeScript → dist/
+pnpm run dev         # Build + run CLI
+pnpm run auth        # Start OAuth server on :3000
+pnpm run typecheck   # Type check without building
+pnpm run format      # Format with Prettier
+```
 
-## Limitations & Known Issues
+## Limitations
 
 ### Personal Microsoft Accounts
 
-- **MailboxNotEnabledForRESTAPI Error**: Personal Microsoft accounts (outlook.com, hotmail.com, live.com) have limited access to the To Do API through Microsoft Graph
-- This is a Microsoft service limitation, not an issue with this application
-- Work/school accounts have full API access
+Personal accounts (outlook.com, hotmail.com, live.com) may encounter `MailboxNotEnabledForRESTAPI` errors. This is a Microsoft service limitation — work/school accounts have full API access.
 
-### API Limitations
+### API Limits
 
-- Rate limits apply according to Microsoft's policies
-- Some features may be unavailable for personal accounts
-- Shared lists have limited functionality
+- Standard Microsoft Graph rate limits apply
+- `$filter` support on `todoTask` is limited (status, importance, dueDateTime work; createdDateTime does not)
 
 ## Troubleshooting
 
-### Authentication Issues
-
-**Token acquisition failures**
-
-- Verify `CLIENT_ID`, `CLIENT_SECRET`, and `TENANT_ID` in your `.env` file
-- Ensure redirect URI matches exactly: `http://localhost:3000/callback`
-- Check Azure App permissions are granted with admin consent
-
-**Permission issues**
-
-- Ensure all required Graph API permissions are added and consented
-- For organizational accounts, admin consent may be required
-
-### Account Type Configuration
-
-**Work/School Accounts**
-
-```env
-TENANT_ID=organizations  # Multi-tenant
-# Or use your specific tenant ID
-```
-
-**Personal Accounts**
-
-```env
-TENANT_ID=consumers  # Personal only
-# Or TENANT_ID=common for both types
-```
-
-### Debugging
-
-**Check authentication status:**
-
+**`could not determine executable to run`** — The `npx` cache may have a stale version. Clear it:
 ```bash
-# Using the MCP tool
-# In your AI assistant: "Check auth status"
-
-# Or examine tokens directly
-cat tokens.json | jq '.expiresAt'
-
-# Convert timestamp to readable date
-date -d @$(($(cat tokens.json | jq -r '.expiresAt') / 1000))
+rm -rf ~/.npm/_npx
 ```
+Then restart Claude Desktop.
 
-**Enable verbose logging:**
+**Token expired errors** — Tokens auto-refresh, but if the refresh token itself expires, re-run `pnpm run auth`.
 
-```bash
-# The server logs to stderr for debugging
-mstodo 2> debug.log
-```
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Run `pnpm run lint` and `pnpm run typecheck` before submitting
-4. Submit a pull request
+**`RequestBroker--ParseUri` from Graph API** — Usually caused by invalid field names in `$select`. The server's default select list is pre-validated against the API.
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file for details
+MIT License — See [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- Fork of [@jhirono/todomcp](https://github.com/jhirono/todomcp)
+- Fork of [@jhirono/todomcp](https://github.com/jhirono/todomcp) via [jordanburke/microsoft-todo-mcp-server](https://github.com/jordanburke/microsoft-todo-mcp-server)
 - Built on the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/sdk)
 - Uses [Microsoft Graph API](https://developer.microsoft.com/en-us/graph)
 
-## Support
+## Links
 
-- [GitHub Issues](https://github.com/jordanburke/microsoft-todo-mcp-server/issues)
-- [npm Package](https://www.npmjs.com/package/microsoft-todo-mcp-server)
+- [npm Package](https://www.npmjs.com/package/mstodo-mcp-server)
+- [GitHub](https://github.com/neelroy/microsoft-todo-mcp-server)
+- [Issues](https://github.com/neelroy/microsoft-todo-mcp-server/issues)
